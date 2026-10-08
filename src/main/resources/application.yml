@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: authors-api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/authors_db}
+    username: ${DB_USERNAME:authors_user}
+    password: ${DB_PASSWORD:authors_password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+open-library:
+  base-url: ${OPEN_LIBRARY_BASE_URL:https://openlibrary.org}
+  works-limit: ${OPEN_LIBRARY_WORKS_LIMIT:100}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,96 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-authors
+      author: codex
+      changes:
+        - createTable:
+            tableName: authors
+            columns:
+              - column:
+                  name: id
+                  type: varchar(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: authors
+            indexName: idx_authors_name
+            columns:
+              - column:
+                  name: name
+
+  - changeSet:
+      id: 002-create-author-works
+      author: codex
+      changes:
+        - createTable:
+            tableName: author_works
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: work_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: author_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: varchar(1024)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: author_works
+            baseColumnNames: author_id
+            referencedTableName: authors
+            referencedColumnNames: id
+            constraintName: fk_author_works_author
+            onDelete: CASCADE
+        - createIndex:
+            tableName: author_works
+            indexName: idx_author_works_author_id
+            columns:
+              - column:
+                  name: author_id
+        - addUniqueConstraint:
+            tableName: author_works
+            columnNames: author_id, work_id
+            constraintName: uq_author_works_author_work

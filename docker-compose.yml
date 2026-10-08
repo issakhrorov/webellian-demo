@@ -1,0 +1,35 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: authors-mysql
+    environment:
+      MYSQL_DATABASE: authors_db
+      MYSQL_USER: authors_user
+      MYSQL_PASSWORD: authors_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: authors-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/authors_db
+      DB_USERNAME: authors_user
+      DB_PASSWORD: authors_password
+      OPEN_LIBRARY_BASE_URL: https://openlibrary.org
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:
