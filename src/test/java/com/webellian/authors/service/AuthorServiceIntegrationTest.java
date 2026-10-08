@@ -90,6 +90,54 @@ class AuthorServiceIntegrationTest {
         assertThat(openLibraryClient.workSearches).isEmpty();
     }
 
+    @Test
+    void trimsAuthorSearchAndSkipsIncompleteResults() {
+        openLibraryClient.authors = List.of(
+                new OpenLibraryAuthor("/authors/OL23919A", "J. K. Rowling"),
+                new OpenLibraryAuthor(null, "Missing ID"),
+                new OpenLibraryAuthor("OL1A", " "),
+                new OpenLibraryAuthor("", "Empty ID"),
+                new OpenLibraryAuthor("OL2A", null));
+
+        List<AuthorResponse> response = authorService.searchAuthors("  rowling  ");
+
+        assertThat(response).containsExactly(new AuthorResponse("OL23919A", "J. K. Rowling"));
+        assertThat(authorRepository.count()).isEqualTo(1);
+        assertThat(openLibraryClient.authorSearches).containsExactly("rowling");
+    }
+
+    @Test
+    void savesWorksWithoutAuthorDetailsAndSkipsIncompleteResults() {
+        openLibraryClient.works = List.of(
+                new OpenLibraryWork("/works/OL82563W", "Harry Potter and the Philosopher's Stone"),
+                new OpenLibraryWork(null, "Missing ID"),
+                new OpenLibraryWork("OL1W", " "),
+                new OpenLibraryWork("", "Empty ID"),
+                new OpenLibraryWork("OL2W", null));
+
+        List<AuthorWorkResponse> response = authorService.searchWorks(" /authors/OL23919A ");
+
+        assertThat(response).containsExactly(
+                new AuthorWorkResponse("OL82563W", "Harry Potter and the Philosopher's Stone"));
+        assertThat(authorRepository.findById("OL23919A")).get()
+                .extracting(Author::getName).isEqualTo("OL23919A");
+        assertThat(authorWorkRepository.count()).isEqualTo(1);
+        assertThat(openLibraryClient.authorLookups).containsExactly("OL23919A");
+        assertThat(openLibraryClient.workSearches).containsExactly("OL23919A");
+    }
+
+    @Test
+    void usesExistingAuthorWhenFetchingWorks() {
+        authorRepository.save(new Author("OL23919A", "J. K. Rowling"));
+        openLibraryClient.works = List.of(new OpenLibraryWork("/works/OL82563W", "Harry Potter"));
+
+        List<AuthorWorkResponse> response = authorService.searchWorks("OL23919A");
+
+        assertThat(response).containsExactly(new AuthorWorkResponse("OL82563W", "Harry Potter"));
+        assertThat(openLibraryClient.authorLookups).isEmpty();
+        assertThat(openLibraryClient.workSearches).containsExactly("OL23919A");
+    }
+
     @TestConfiguration
     static class TestConfig {
 

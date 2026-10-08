@@ -12,6 +12,7 @@ import com.webellian.authors.repository.AuthorWorkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,15 +36,18 @@ public class AuthorService {
 
     @Transactional
     public List<AuthorResponse> searchAuthors(String name) {
-        List<Author> cachedAuthors = authorRepository.findByNameContainingIgnoreCaseOrderByNameAsc(name.trim());
+        String searchTerm = name.trim();
+        List<Author> cachedAuthors = authorRepository.findByNameContainingIgnoreCaseOrderByNameAsc(searchTerm);
         if (!cachedAuthors.isEmpty()) {
             return cachedAuthors.stream().map(AuthorResponse::from).toList();
         }
 
-        List<Author> authors = openLibraryClient.searchAuthors(name.trim()).stream()
-                .filter(author -> hasText(author.key()) && hasText(author.name()))
-                .map(this::upsertAuthor)
-                .toList();
+        List<Author> authors = new ArrayList<>();
+        for (OpenLibraryAuthor author : openLibraryClient.searchAuthors(searchTerm)) {
+            if (hasText(author.key()) && hasText(author.name())) {
+                authors.add(saveAuthor(author));
+            }
+        }
 
         return authors.stream().map(AuthorResponse::from).toList();
     }
@@ -57,19 +61,21 @@ public class AuthorService {
         }
 
         Author author = findOrCreateAuthor(normalizedAuthorId);
-        List<AuthorWork> works = openLibraryClient.searchWorks(normalizedAuthorId).stream()
-                .filter(work -> hasText(work.key()) && hasText(work.title()))
-                .map(work -> upsertWork(author, work))
-                .toList();
+        List<AuthorWork> works = new ArrayList<>();
+        for (OpenLibraryWork work : openLibraryClient.searchWorks(normalizedAuthorId)) {
+            if (hasText(work.key()) && hasText(work.title())) {
+                works.add(saveWork(author, work));
+            }
+        }
 
         return works.stream().map(AuthorWorkResponse::from).toList();
     }
 
-    private Author upsertAuthor(OpenLibraryAuthor openLibraryAuthor) {
-        String authorId = normalizeOpenLibraryId(openLibraryAuthor.key());
+    private Author saveAuthor(OpenLibraryAuthor result) {
+        String authorId = normalizeOpenLibraryId(result.key());
         Author author = authorRepository.findById(authorId)
-                .orElseGet(() -> new Author(authorId, openLibraryAuthor.name()));
-        author.updateName(openLibraryAuthor.name());
+                .orElseGet(() -> new Author(authorId, result.name()));
+        author.updateName(result.name());
         return authorRepository.save(author);
     }
 
@@ -79,17 +85,19 @@ public class AuthorService {
             return cachedAuthor.get();
         }
 
-        return openLibraryClient.getAuthor(authorId)
+        // Works need an author row even when Open Library has no author details.
+        String name = openLibraryClient.getAuthor(authorId)
                 .filter(author -> hasText(author.name()))
-                .map(author -> authorRepository.save(new Author(authorId, author.name())))
-                .orElseGet(() -> authorRepository.save(new Author(authorId, authorId)));
+                .map(author -> author.name())
+                .orElse(authorId);
+        return authorRepository.save(new Author(authorId, name));
     }
 
-    private AuthorWork upsertWork(Author author, OpenLibraryWork openLibraryWork) {
-        String workId = normalizeOpenLibraryId(openLibraryWork.key());
+    private AuthorWork saveWork(Author author, OpenLibraryWork result) {
+        String workId = normalizeOpenLibraryId(result.key());
         AuthorWork work = authorWorkRepository.findByAuthorIdAndWorkId(author.getId(), workId)
-                .orElseGet(() -> new AuthorWork(workId, author, openLibraryWork.title()));
-        work.updateTitle(openLibraryWork.title());
+                .orElseGet(() -> new AuthorWork(workId, author, result.title()));
+        work.updateTitle(result.title());
         return authorWorkRepository.save(work);
     }
 

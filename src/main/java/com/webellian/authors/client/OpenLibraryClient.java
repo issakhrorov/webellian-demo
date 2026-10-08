@@ -2,6 +2,7 @@ package com.webellian.authors.client;
 
 import com.webellian.authors.config.OpenLibraryProperties;
 import com.webellian.authors.service.OpenLibraryException;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -30,14 +31,15 @@ public class OpenLibraryClient {
                         .queryParam("q", name)
                         .build())
                 .retrieve()
-                .onStatus(status -> status.isError(), clientResponse -> Mono.error(
+                .onStatus(HttpStatusCode::isError, clientResponse -> Mono.error(
                         new OpenLibraryException("Author search returned HTTP " + clientResponse.statusCode().value())))
                 .bodyToMono(OpenLibraryAuthorSearchResponse.class)
                 .block(REQUEST_TIMEOUT);
 
-        return Optional.ofNullable(response)
-                .map(OpenLibraryAuthorSearchResponse::docs)
-                .orElseGet(List::of);
+        if (response == null || response.docs() == null) {
+            return List.of();
+        }
+        return response.docs();
     }
 
     public Optional<OpenLibraryAuthorDetails> getAuthor(String authorId) {
@@ -45,7 +47,7 @@ public class OpenLibraryClient {
                 .uri("/authors/{authorId}.json", authorId)
                 .retrieve()
                 .onStatus(status -> status.value() == 404, clientResponse -> Mono.empty())
-                .onStatus(status -> status.isError(), clientResponse -> Mono.error(
+                .onStatus(HttpStatusCode::isError, clientResponse -> Mono.error(
                         new OpenLibraryException("Author lookup returned HTTP " + clientResponse.statusCode().value())))
                 .bodyToMono(OpenLibraryAuthorDetails.class)
                 .block(REQUEST_TIMEOUT));
@@ -58,13 +60,14 @@ public class OpenLibraryClient {
                         .queryParam("limit", properties.worksLimit())
                         .build(authorId))
                 .retrieve()
-                .onStatus(status -> status.isError(), clientResponse -> Mono.error(
+                .onStatus(HttpStatusCode::isError, clientResponse -> Mono.error(
                         new OpenLibraryException("Works search returned HTTP " + clientResponse.statusCode().value())))
                 .bodyToMono(OpenLibraryWorksResponse.class)
                 .block(REQUEST_TIMEOUT);
 
-        return Optional.ofNullable(response)
-                .map(OpenLibraryWorksResponse::entries)
-                .orElseGet(List::of);
+        if (response == null || response.entries() == null) {
+            return List.of();
+        }
+        return response.entries();
     }
 }
